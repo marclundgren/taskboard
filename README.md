@@ -1,0 +1,217 @@
+# Taskboard
+
+A self-hosted kanban board for a household — shared boards you both see, private boards only you see, and drag and drop that works with a mouse, a finger, or the keyboard. It is a static site: no server to run, no build step, no dependencies to install. Drop it on GitHub Pages and it works.
+
+![The board in light mode](docs/screenshot-board-light.png)
+
+<details>
+<summary>Dark mode &amp; mobile</summary>
+
+![The board in dark mode](docs/screenshot-board-dark.png)
+![The board on a phone](docs/screenshot-mobile.png)
+
+</details>
+
+---
+
+## What it does
+
+**Boards**
+- Private boards (just you) and shared boards (you + whoever you invite), split into two groups in the sidebar
+- Per-board columns you can rename, reorder, delete, or mark as the "done" column
+- Per-board labels with colours
+- Emoji + name per board, deep-linkable at `#/b/<boardId>`
+
+**Cards**
+- Title, notes, assignee, due date, priority, labels, and a checklist with a progress bar
+- Due dates turn amber as they approach and red once overdue
+- Everything in the task dialog auto-saves — there is no Save button to forget
+- Inline composer: click *+ Add task*, type, press Enter, keep typing for the next one
+
+**Kanban discipline**
+- **WIP limits** per column. The column header shows `3/3`, and going over turns the column red with a nudge to finish something before starting more. This is the one rule that makes a kanban board more than a to-do list — limiting work in progress is what surfaces bottlenecks and stops half-finished work piling up. ([Asana's kanban guide](https://asana.com/resources/what-is-kanban), [IxDF on kanban boards](https://ixdf.org/literature/topics/kanban-boards))
+- A "done" column marks its cards as complete, and *Hide tasks in done columns* keeps the board about what's live
+
+**Finding things**
+- Instant search across titles and notes
+- Filters for assignee (including *Me* and *Unassigned*), due window (overdue / today / next 7 days / no date), priority, and label — with a count badge so you never forget a filter is on
+
+**Moving cards — three ways**
+1. **Drag** with a mouse: pick up a card, columns open a gap where it will land, and the board auto-scrolls when you drag near an edge. Column headers drag too, to reorder columns.
+2. **Touch**: press and hold a card for a moment, then drag. A short hold keeps ordinary finger-scrolling working.
+3. **Keyboard**: Tab to a card, press <kbd>Space</kbd> to pick it up, move with the arrow keys, <kbd>Space</kbd> again to drop. Every move is announced to screen readers. There is also a *Move to →* menu on each card and a Column dropdown in the task dialog.
+
+That third path isn't decoration: WCAG 2.2 asks that anything you can do by dragging also be doable with a single pointer or the keyboard ([SC 2.5.7 Dragging Movements](https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html)).
+
+**Other niceties** — light/dark/system themes, works on phones, installable as a PWA, `?` opens the shortcut sheet.
+
+---
+
+## Quick start (2 minutes, local mode)
+
+```bash
+git clone https://github.com/marclundgren/taskboard.git
+cd taskboard
+python3 -m http.server 8000     # or: npx http-server -p 8000
+```
+
+Open <http://localhost:8000>, type a name, and you have a board. In **local mode** everything lives in this browser's `localStorage` — no account, no network. Great for trying it out; not shareable, and it does not follow you to your phone.
+
+To share boards with your partner, set up **cloud mode** below.
+
+## Publishing to GitHub Pages
+
+The repo *is* the site — there is nothing to build.
+
+1. Push this repository to GitHub with the site files at the root of `main`.
+2. **Settings → Pages → Build and deployment → Source: Deploy from a branch**, then pick `main` and `/ (root)`.
+3. Give it a minute; your board is at `https://<you>.github.io/taskboard/`.
+
+`.nojekyll` is included so GitHub serves every file as-is.
+
+> **Note:** a GitHub Pages site is public — anyone with the URL loads the app. That is fine, because the *app* is public but your *data* is not: in local mode the data never leaves your browser, and in cloud mode it lives in your Firebase project behind sign-in and the rules in `firestore.rules`. Never put anything secret in this repo.
+
+---
+
+## Cloud mode setup (about 5 minutes)
+
+Cloud mode gives you what a static site can't do alone: separate logins for you and your partner, boards shared between you, and realtime sync across devices. It uses Firebase — the free Spark tier is far more than a couple's task board will ever need.
+
+**1. Create the project**
+
+- Go to <https://console.firebase.google.com>, **Add project** (Google Analytics: not needed).
+- **Build → Authentication → Get started → Sign-in method → Google → Enable**. Pick a support email, save.
+  (Want GitHub sign-in too? Enable the GitHub provider and add `'github'` to `authProviders` in `config.js`.)
+- **Build → Firestore Database → Create database → Start in production mode**, pick a region near you.
+
+**2. Register the web app**
+
+- **Project settings (⚙) → Your apps → Web (`</>`)**, give it a nickname, register.
+- Copy the `firebaseConfig` values it shows you.
+
+**3. Paste them into `config.js`**
+
+```js
+firebase: {
+  apiKey: 'AIza…',
+  authDomain: 'your-project.firebaseapp.com',
+  projectId: 'your-project',
+  appId: '1:1234567890:web:abcdef',
+},
+```
+
+These are not secrets — Firebase web config is public by design, and access is enforced by the security rules, not by hiding the keys.
+
+**4. Deploy the security rules** — this is the step that actually protects your data.
+
+Paste the contents of [`firestore.rules`](firestore.rules) into **Firestore → Rules → Publish**, or with the CLI:
+
+```bash
+npm i -g firebase-tools
+firebase login
+firebase use --add        # pick your project
+firebase deploy --only firestore:rules
+```
+
+**5. Authorise your domain**
+
+**Authentication → Settings → Authorized domains → Add domain** → `<you>.github.io`. (`localhost` is allowed out of the box.)
+
+**6. Invite your partner**
+
+Commit and push, open the Pages URL, sign in with Google. Have your partner open the same URL and sign in once — that publishes their profile. Then open a board → **Share** → type their email → **Add**. The board moves to *Shared* for both of you and edits appear on each other's screens live.
+
+### How access works
+
+One idea, applied everywhere: a board is visible to exactly the user IDs listed in its `memberIds`. A private board is one where that list is just you.
+
+| Path | Who can read | Who can write |
+| --- | --- | --- |
+| `boards/{id}` | members | members (the owner can't be changed; only the owner can delete) |
+| `boards/{id}/tasks/{id}` | members | members |
+| `users/{uid}` | any signed-in user | only that user |
+| `emailIndex/{email}` | any signed-in user | only the owner of that email |
+
+`emailIndex` is what makes "invite by email" work without a server: each person claims their own email → uid mapping when they sign in. It means a signed-in user can check whether an email has an account here — the tradeoff for serverless invites on a board you host yourself.
+
+Everyone on a shared board is an equal editor, including inviting and removing others. For a household board that's the point; if you ever want owner-only invites, tighten the `update` rule in `firestore.rules`.
+
+---
+
+## Keyboard shortcuts
+
+| Key | Action |
+| --- | --- |
+| <kbd>N</kbd> | New task in the first column |
+| <kbd>B</kbd> | New board |
+| <kbd>/</kbd> | Focus search |
+| <kbd>Tab</kbd> | Move between cards |
+| <kbd>Space</kbd> | Pick up / drop the focused card |
+| <kbd>←</kbd> <kbd>→</kbd> | Move a picked-up card between columns |
+| <kbd>↑</kbd> <kbd>↓</kbd> | Move a picked-up card within its column |
+| <kbd>Enter</kbd> | Open the focused card |
+| <kbd>Esc</kbd> | Close a dialog, cancel a move, clear search |
+| <kbd>?</kbd> | Shortcut sheet |
+
+---
+
+## How it's built
+
+Plain ES modules, no framework, no bundler — so what you push is exactly what runs, and it will still run in five years.
+
+```
+index.html               app shell
+config.js                your settings (Firebase config goes here)
+firestore.rules          who can read and write what
+assets/css/styles.css    design tokens + all styling, light and dark
+assets/js/
+  app.js                 state, actions, routing, keyboard, wiring
+  dnd.js                 pointer-driven drag and drop (mouse, touch, pen)
+  util.js                dates, ordering maths, small helpers
+  data/
+    index.js             picks the backend from config.js
+    local.js             localStorage backend
+    firebase.js          Firestore + Auth backend
+    model.js             board/task shapes
+  ui/
+    board.js             columns, cards, composer, keyboard moving
+    task-modal.js        the task dialog
+    dialogs.js           new board, settings, share, filters, shortcuts
+    sidebar.js  menu.js  modal.js  toast.js  common.js  icons.js
+```
+
+**Both backends implement the same interface**, so the UI never knows which one it is talking to. Adding a third (Supabase, a CouchDB, your own API) means writing one more file in `data/`.
+
+**Card ordering** uses a numeric `order` field. Dropping a card between two others gives it the midpoint of their two orders, so a move writes exactly one document instead of renumbering the column. When midpoints run out of precision the column is renumbered once in a batch.
+
+**Data model**
+
+```
+boards/{boardId}
+  name, emoji, ownerId, memberIds[], visibility, columns[], labels[], timestamps
+boards/{boardId}/tasks/{taskId}
+  title, notes, columnId, order, priority, labels[], dueDate,
+  assigneeId, checklist[], done, timestamps
+users/{uid}            displayName, email, photoURL
+emailIndex/{email}     uid
+```
+
+In local mode the same shapes are stored under `taskboard:v1:*` keys in `localStorage`.
+
+---
+
+## FAQ
+
+**Can I use it offline?** Local mode is entirely offline. Cloud mode keeps working while the connection drops and syncs when it returns (Firestore queues writes locally); a hard reload while offline needs the page cached by the browser.
+
+**How do I move my local boards into cloud mode?** In DevTools, copy the `taskboard:v1:boards` and `taskboard:v1:tasks:*` values before you switch, then re-create the boards. There's no importer yet — for a handful of boards, retyping is usually faster than writing one.
+
+**Is my data private?** In local mode it never leaves your machine. In cloud mode it sits in your own Firebase project, readable only by the members of each board. Nothing is sent anywhere else — there is no analytics, no tracking, no third-party script beyond the Firebase SDK.
+
+**What does it cost?** Nothing. GitHub Pages is free, and Firebase's free tier allows 50k document reads a day — a busy household board uses a rounding error of that.
+
+**Can I self-host somewhere else?** Any static host works: Netlify, Cloudflare Pages, an nginx directory, a Raspberry Pi. Copy the files, done.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

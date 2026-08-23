@@ -1,0 +1,61 @@
+rules_version = '2';
+
+/*
+  Taskboard access rules.
+
+  The whole model is one idea: a board is visible to exactly the uids listed in
+  its memberIds array. A "private" board is one where that list is just you.
+  Tasks live under the board and inherit its membership.
+
+  Deploy with:  firebase deploy --only firestore:rules
+  (or paste this file into Firebase console -> Firestore -> Rules)
+*/
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(board) {
+      return signedIn() && request.auth.uid in board.memberIds;
+    }
+
+    function boardData(boardId) {
+      return get(/databases/$(database)/documents/boards/$(boardId)).data;
+    }
+
+    // Profile cards, so members of a shared board can see each other's name.
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.uid == userId;
+    }
+
+    // email -> uid, so a board owner can invite someone by their email address.
+    // Readable by any signed-in user; each person may only claim their own email.
+    match /emailIndex/{email} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /boards/{boardId} {
+      allow read: if isMember(resource.data);
+
+      allow create: if signedIn()
+                    && request.resource.data.ownerId == request.auth.uid
+                    && request.auth.uid in request.resource.data.memberIds;
+
+      // Any member may edit the board (columns, labels, invites). Ownership is
+      // fixed: a member cannot promote themselves to owner.
+      allow update: if isMember(resource.data)
+                    && request.resource.data.ownerId == resource.data.ownerId;
+
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+
+      match /tasks/{taskId} {
+        allow read, write: if isMember(boardData(boardId));
+      }
+    }
+  }
+}
