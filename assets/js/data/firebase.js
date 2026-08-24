@@ -66,7 +66,7 @@ export function createFirebaseProvider(config) {
       return new Error('That sign-in provider is not enabled in your Firebase project yet.');
     }
     if (code === 'permission-denied') {
-      return new Error('Firestore rules rejected that. Deploy the rules from firestore.rules.');
+      return new Error('Firestore rejected that write. In the Firebase console, open Firestore Database \u2192 Rules, paste the contents of firestore.rules over what is there, and press Publish.');
     }
     if (code === 'failed-precondition') {
       return new Error('Firestore is not set up in this project yet — create the database in the Firebase console.');
@@ -136,7 +136,8 @@ export function createFirebaseProvider(config) {
 
     async createBoard(data) {
       const { addDoc, collection } = fb.db;
-      const ref = await addDoc(collection(db, 'boards'), makeBoard({ ...data, ownerId: user.uid }));
+      const ref = await addDoc(collection(db, 'boards'), makeBoard({ ...data, ownerId: user.uid }))
+        .catch((e) => { throw friendlyError(e); });
       return ref.id;
     },
 
@@ -148,7 +149,7 @@ export function createFirebaseProvider(config) {
     async deleteBoard(boardId) {
       const { getDocs, writeBatch, deleteDoc } = fb.db;
       // Firestore keeps subcollections when a parent is deleted — clear tasks first.
-      const snap = await getDocs(tasksRef(boardId));
+      const snap = await getDocs(tasksRef(boardId)).catch((e) => { throw friendlyError(e); });
       for (let i = 0; i < snap.docs.length; i += 400) {
         const batch = writeBatch(db);
         snap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
