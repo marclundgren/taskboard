@@ -15,10 +15,10 @@ export const config = {
   appName: 'Taskboard',
 
   firebase: {
-    // apiKey: 'AIza...',
-    // authDomain: 'your-project.firebaseapp.com',
-    // projectId: 'your-project',
-    // appId: '1:1234567890:web:abcdef',
+    apiKey: 'AIzaSyDxDat66PNOxFzq9p6Hr0K6KpamyldTWSo',
+    authDomain: 'taskboard-19542.firebaseapp.com',
+    projectId: 'taskboard-19542',
+    appId: '1:858336270094:web:3fed9d50262025e093e95f',
   },
 
   /**

@@ -80,7 +80,9 @@ export function createFirebaseProvider(config) {
     get user() { return user; },
 
     async init() {
-      fb = await load();
+      fb = await load().catch(() => {
+        throw new Error("Couldn't load Firebase. Check your connection — a content blocker or offline network can stop gstatic.com from loading.");
+      });
       const app = fb.app.initializeApp(config.firebase);
       auth = fb.auth.getAuth(app);
       db = fb.db.getFirestore(app);

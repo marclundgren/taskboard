@@ -82,7 +82,13 @@ function showAuth(error) {
     onclick: () => state.provider.signIn(),
   });
 
-  if (cloud) {
+  if (cloud && !state.provider) {
+    // Firebase never started (offline, blocked script). Say so, and offer a retry.
+    actions.append(el('button', {
+      class: 'btn btn--primary', type: 'button', text: 'Try again',
+      onclick: () => location.reload(),
+    }));
+  } else if (cloud) {
     for (const p of state.provider.providers) {
       actions.append(el('button', {
         class: 'btn btn--primary', type: 'button',
