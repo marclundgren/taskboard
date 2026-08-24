@@ -15,6 +15,7 @@ import { openMenu } from './ui/menu.js';
 import { confirmModal, promptModal } from './ui/modal.js';
 import { toast, errorToast, announce } from './ui/toast.js';
 import { avatarNode } from './ui/common.js';
+import { renderGoogleButton } from './data/google-identity.js';
 import { icons } from './ui/icons.js';
 
 const LAST_BOARD_KEY = 'taskboard:v1:lastBoard';
@@ -63,18 +64,25 @@ applyTheme(localStorage.getItem(THEME_KEY) || 'system');
 function showAuth(error) {
   $('#boot').hidden = true;
   $('#app').hidden = true;
-  const screen = $('#auth-screen');
-  screen.hidden = false;
+  $('#auth-screen').hidden = false;
 
   const cloud = isCloudConfigured();
+  const clientId = config.google?.clientId;
+
   $('#auth-sub').textContent = cloud
-    ? 'Sign in to reach your boards from any device — and share the ones you want to share.'
-    : 'Running in local mode: your boards stay in this browser. No account, no server, no waiting.';
+    ? 'Sign in with Google to reach your boards from any device — and share the ones you want to share.'
+    : 'Sign in with Google to keep your boards to yourself. In local mode they stay in this browser.';
 
   const actions = $('#auth-actions');
   actions.replaceChildren();
 
-  if (cloud && state.provider) {
+  const deviceButton = () => el('button', {
+    class: cloud || clientId ? 'btn' : 'btn btn--primary', type: 'button',
+    text: 'Continue on this device',
+    onclick: () => state.provider.signIn(),
+  });
+
+  if (cloud) {
     for (const p of state.provider.providers) {
       actions.append(el('button', {
         class: 'btn btn--primary', type: 'button',
@@ -86,23 +94,36 @@ function showAuth(error) {
         },
       }));
     }
-  } else {
-    const name = el('input', { class: 'input', placeholder: 'Your name', value: '' });
-    actions.append(
-      name,
-      el('button', {
-        class: 'btn btn--primary', type: 'button', text: 'Start',
-        onclick: () => state.provider.signIn({ displayName: name.value }),
-      }),
-    );
-    name.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') state.provider.signIn({ displayName: name.value });
+  } else if (clientId) {
+    const holder = el('div', { class: 'gsi-button' });
+    const hint = el('p', { class: 'meta-note', text: 'Loading Google sign-in…', style: 'text-align:center;margin:0' });
+    actions.append(holder, hint);
+
+    // If Google is slow or unreachable, don't leave the screen with no way in.
+    let settled = false;
+    const offerFallback = () => { if (!actions.contains(fallback)) actions.append(fallback); };
+    const fallback = deviceButton();
+    const slow = setTimeout(() => { if (!settled) offerFallback(); }, 6000);
+    const finish = () => { settled = true; clearTimeout(slow); hint.remove(); };
+
+    renderGoogleButton(holder, {
+      clientId,
+      onProfile: (profile) => state.provider.signIn(profile),
+      onError: (err) => showAuthError(err.message),
+    }).then(finish).catch((err) => {
+      finish();
+      showAuthError(err.message);
+      offerFallback();
     });
+  } else {
+    actions.append(deviceButton());
   }
 
   $('#auth-note').innerHTML = cloud
     ? 'Your data lives in your own Firebase project. Access is enforced by the rules in <code>firestore.rules</code>.'
-    : 'Want separate logins and shared boards? Add your Firebase config to <code>config.js</code> — see the README.';
+    : clientId
+      ? 'Signing in keeps your boards apart from anyone else using this computer — but they still live only in this browser. Add your Firebase config to <code>config.js</code> to sync across devices and share boards.'
+      : 'Add a Google client id to <code>config.js</code> for real sign-in, and Firebase config to sync across devices — see the README.';
 
   if (error) showAuthError(error.message || String(error));
 }
@@ -576,11 +597,20 @@ function openUserMenu(anchor) {
     { label: 'Dark', icon: icons.moon, checked: theme === 'dark', onSelect: () => applyTheme('dark') },
     { type: 'sep' },
     { label: 'Keyboard shortcuts', icon: icons.keyboard, onSelect: shortcutsDialog },
-    {
-      label: state.provider.mode === 'cloud' ? 'Sign out' : 'Switch profile',
-      icon: icons.logout, onSelect: () => state.provider.signOut(),
-    },
-  ]);
+    state.provider.updateProfile ? {
+      label: 'Change display name', icon: icons.pencil, onSelect: renameSelf,
+    } : null,
+    { label: 'Sign out', icon: icons.logout, onSelect: () => state.provider.signOut() },
+  ].filter(Boolean));
+}
+
+async function renameSelf() {
+  const name = await promptModal({
+    title: 'Display name', label: 'Shown on cards you are assigned',
+    value: state.user.displayName || '',
+  });
+  if (!name) return;
+  await state.provider.updateProfile({ displayName: name }).catch(errorToast);
 }
 
 function applyTheme(theme) {

@@ -16,6 +16,11 @@ A self-hosted kanban board for a household — shared boards you both see, priva
 
 ## What it does
 
+**Signing in**
+- **Continue with Google** in both modes — same button, same account, whichever backend you run
+- In cloud mode that account is your identity everywhere: sign in on your laptop, phone and tablet and you get the same boards, syncing live
+- In local mode it keeps two people's boards apart on a shared computer (the data still never leaves that browser)
+
 **Boards**
 - Private boards (just you) and shared boards (you + whoever you invite), split into two groups in the sidebar
 - Per-board columns you can rename, reorder, delete, or mark as the "done" column
@@ -55,9 +60,9 @@ cd taskboard
 python3 -m http.server 8000     # or: npx http-server -p 8000
 ```
 
-Open <http://localhost:8000>, type a name, and you have a board. In **local mode** everything lives in this browser's `localStorage` — no account, no network. Great for trying it out; not shareable, and it does not follow you to your phone.
+Open <http://localhost:8000>, click **Continue on this device**, and you have a board. In **local mode** everything lives in this browser's `localStorage` — no account, no network. Great for trying it out; not shareable, and it does not follow you to your phone.
 
-To share boards with your partner, set up **cloud mode** below.
+Want the Google button here too? See [Google sign-in in local mode](#google-sign-in-in-local-mode). To share boards with your partner, set up **cloud mode** below.
 
 ## Publishing to GitHub Pages
 
@@ -72,6 +77,38 @@ The repo *is* the site — there is nothing to build.
 > **Note:** a GitHub Pages site is public — anyone with the URL loads the app. That is fine, because the *app* is public but your *data* is not: in local mode the data never leaves your browser, and in cloud mode it lives in your Firebase project behind sign-in and the rules in `firestore.rules`. Never put anything secret in this repo.
 
 ---
+
+## How sign-in works
+
+Both modes show the same **Continue with Google** button, but they mean different things — worth knowing which you're relying on.
+
+| | Local mode | Cloud mode |
+| --- | --- | --- |
+| Who identifies you | Google Identity Services, in the browser | Firebase Auth |
+| Where boards live | this browser's `localStorage` | your Firestore database |
+| Same boards on another device | **no** | **yes** — sign in and they're there |
+| Two people, one computer | separate boards, side by side | separate accounts |
+| Is it a security boundary | **no** — see below | yes, enforced by `firestore.rules` |
+
+**Multi-device is a cloud-mode feature, and it needs no matching logic.** Your Google account has a stable id, and every board and card keys off that id rather than a name — `memberIds`, `assigneeId`, everything. Sign in with the same account anywhere and the same boards appear. Your partner signs in with theirs, gets a different id, and sees only the boards they're a member of. Neither of you has to be named anything in particular.
+
+**Local-mode sign-in is organisational, not protective.** The ID token is decoded in the browser for your name and picture, but it cannot be *verified* without a server, and the boards sit in `localStorage` where anyone with dev tools on that machine can read them. It stops your partner from opening your laptop and landing in your private boards; it is not a lock. If you want a real boundary, that's cloud mode.
+
+### Google sign-in in local mode
+
+Optional — skip it and local mode uses a single "continue on this device" profile.
+
+1. In the [Google Cloud console → Credentials](https://console.cloud.google.com/apis/credentials), **Create credentials → OAuth client ID → Web application**.
+2. Under **Authorized JavaScript origins** add every origin you'll open the site from, e.g. `https://marclundgren.github.io` and `http://localhost:8000`.
+3. Put the client id in `config.js`:
+
+```js
+google: {
+  clientId: '1234567890-abc.apps.googleusercontent.com',
+},
+```
+
+In cloud mode this setting is ignored — Firebase brings its own Google client.
 
 ## Cloud mode setup (about 5 minutes)
 
@@ -172,6 +209,7 @@ assets/js/
     index.js             picks the backend from config.js
     local.js             localStorage backend
     firebase.js          Firestore + Auth backend
+    google-identity.js   the Google sign-in button used by local mode
     model.js             board/task shapes
   ui/
     board.js             columns, cards, composer, keyboard moving
@@ -196,7 +234,7 @@ users/{uid}            displayName, email, photoURL
 emailIndex/{email}     uid
 ```
 
-In local mode the same shapes are stored under `taskboard:v1:*` keys in `localStorage`.
+In local mode the same shapes are stored in `localStorage`, namespaced per account: `taskboard:v1:u:<uid>:boards` and `taskboard:v1:u:<uid>:tasks:<boardId>`.
 
 ---
 
@@ -204,7 +242,9 @@ In local mode the same shapes are stored under `taskboard:v1:*` keys in `localSt
 
 **Can I use it offline?** Local mode is entirely offline. Cloud mode keeps working while the connection drops and syncs when it returns (Firestore queues writes locally); a hard reload while offline needs the page cached by the browser.
 
-**How do I move my local boards into cloud mode?** In DevTools, copy the `taskboard:v1:boards` and `taskboard:v1:tasks:*` values before you switch, then re-create the boards. There's no importer yet — for a handful of boards, retyping is usually faster than writing one.
+**Can I use the same account on my phone and my laptop?** In cloud mode, yes — that's what it's for. Sign in with the same Google account on each device and you get the same boards, updating live. In local mode, no: the data physically lives in one browser, so two devices are two separate sets of boards no matter who signs in.
+
+**How do I move my local boards into cloud mode?** In DevTools, copy your `taskboard:v1:u:<uid>:*` values before you switch, then re-create the boards. There's no importer yet — for a handful of boards, retyping is usually faster than writing one.
 
 **Is my data private?** In local mode it never leaves your machine. In cloud mode it sits in your own Firebase project, readable only by the members of each board. Nothing is sent anywhere else — there is no analytics, no tracking, no third-party script beyond the Firebase SDK.
 

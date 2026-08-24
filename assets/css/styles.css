@@ -601,3 +601,6 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 .row--tight { flex-wrap: nowrap; }
 .row--tight > .input, .row--tight > .grow { flex: 1 1 auto; min-width: 0; }
 .row--tight > .btn { flex: none; }
+
+/* Google's own sign-in button needs to sit centred in our button stack. */
+.gsi-button { display: flex; justify-content: center; min-height: 44px; }

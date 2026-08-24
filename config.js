@@ -21,6 +21,19 @@ export const config = {
     // appId: '1:1234567890:web:abcdef',
   },
 
+  /**
+   * Google sign-in for LOCAL mode. Create an OAuth client id at
+   * https://console.cloud.google.com/apis/credentials (type: Web application)
+   * and list your site under "Authorized JavaScript origins", e.g.
+   * https://you.github.io and http://localhost:8000
+   *
+   * Leave blank and local mode falls back to a single "continue on this
+   * device" profile. In CLOUD mode this is ignored — Firebase handles it.
+   */
+  google: {
+    clientId: '',
+  },
+
   /** Sign-in buttons to show in cloud mode: 'google' and/or 'github'. */
   authProviders: ['google'],
 
