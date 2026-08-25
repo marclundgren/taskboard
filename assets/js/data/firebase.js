@@ -85,7 +85,18 @@ export function createFirebaseProvider(config) {
       });
       const app = fb.app.initializeApp(config.firebase);
       auth = fb.auth.getAuth(app);
-      db = fb.db.getFirestore(app);
+      // Persist the cache (and any writes still queued) in IndexedDB rather
+      // than memory, so a refresh mid-write doesn't lose work. Falls back to
+      // the default memory cache if the browser refuses IndexedDB.
+      try {
+        const { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } = fb.db;
+        db = initializeFirestore(app, {
+          localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        });
+      } catch (err) {
+        console.warn('[taskboard] persistent cache unavailable, using memory cache', err);
+        db = fb.db.getFirestore(app);
+      }
       await fb.auth.setPersistence(auth, fb.auth.browserLocalPersistence).catch(() => {});
       // Completes a redirect sign-in (used when popups are unavailable).
       await fb.auth.getRedirectResult(auth).catch(() => {});
