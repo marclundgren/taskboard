@@ -59,6 +59,28 @@ try {
      await phone.locator('.modal:has-text("Add column")').isVisible().catch(() => false));
   await phone.keyboard.press('Escape');
 
+  // --- iOS zooms the page when a focused field is under 16px ---
+  const fieldSizes = () => phone.evaluate(() => [...document.querySelectorAll('input, textarea, select')]
+    .filter((el) => el.type !== 'checkbox' && el.offsetParent !== null)
+    .map((el) => ({ el: el.className || el.type, px: parseFloat(getComputedStyle(el).fontSize) })));
+
+  const tooSmall = [];
+  const collect = async () => tooSmall.push(...(await fieldSizes()).filter((f) => f.px < 16));
+
+  await phone.locator('.column', { hasText: 'To do' }).locator('.column__foot button').tap();
+  await collect();                                        // the card composer
+  await phone.keyboard.press('Escape');
+
+  await phone.locator('.card').first().tap();
+  await phone.waitForSelector('.modal');
+  await collect();                                        // title, selects, due date, notes
+  await phone.locator('.modal button:has-text("+ Add item")').tap();
+  await collect();                                        // checklist row
+  await phone.keyboard.press('Escape');
+
+  ok('mobile: no text field is small enough to trigger iOS zoom on focus',
+     tooSmall.length === 0, JSON.stringify(tooSmall));
+
   // columns should still snap, or the phone layout loses its rhythm
   const snaps = await phone.evaluate(() => getComputedStyle(document.getElementById('board')).scrollSnapType);
   ok('mobile: columns still snap while scrolling', snaps.startsWith('x'), snaps);

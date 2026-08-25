@@ -666,3 +666,23 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 }
 .swatch:hover { transform: scale(1.12); }
 .swatch[aria-pressed="true"] { border-color: var(--text); }
+
+
+/* ============================================================
+   Touch input sizing
+   ------------------------------------------------------------
+   iOS Safari zooms the whole page whenever a focused field's text
+   is smaller than 16px, and it does not zoom back out on blur —
+   which leaves the board panned sideways and awkward to scroll.
+   Keeping every text control at 16px on touch devices removes the
+   trigger entirely, without taking deliberate pinch-zoom away.
+   ============================================================ */
+@media (pointer: coarse) {
+  input, textarea, select,
+  .input, .textarea, .select,
+  .search input,
+  .composer textarea,
+  .check-row .check-text { font-size: 16px; }
+  .title-input { font-size: 19px; }
+  .btn, .chip { font-size: 14px; }
+}
