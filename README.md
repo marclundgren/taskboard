@@ -203,6 +203,15 @@ Everyone on a shared board is an equal editor, including inviting and removing o
 
 ## Tests
 
+`tests/ui` runs Playwright against the app in local mode — no backend needed:
+
+```bash
+node tests/ui/ui.mjs
+```
+
+It covers dragging, keyboard moving, and that the far end of the board stays
+reachable on a phone.
+
 `tests/e2e` runs the real app against the Firebase emulators in two isolated
 browser profiles and proves a task created in one is stored server-side and
 visible in the other — including live sync and offline queueing. See

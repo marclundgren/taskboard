@@ -609,8 +609,12 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 }
 @media (max-width: 560px) {
   :root { --col-w: 84vw; }
-  .board { padding: 10px; scroll-snap-type: x mandatory; }
-  .column { scroll-snap-align: center; }
+  /* Proximity, not mandatory: mandatory snapping pulled the scroller back to
+     the last column and put "Add column" permanently out of reach. Everything
+     scrollable in the row is a snap target, including that button. */
+  .board { padding: 10px; scroll-snap-type: x proximity; }
+  .column, .add-column { scroll-snap-align: center; }
+  .add-column { width: min(210px, 62vw); }
   .search { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
