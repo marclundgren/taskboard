@@ -47,6 +47,7 @@ let lastDragEnd = 0;
    Boot
    ================================================================== */
 applyTheme(localStorage.getItem(THEME_KEY) || 'system');
+trackVisualViewport();
 applyAccent(localStorage.getItem(ACCENT_KEY) || 'violet');
 
 (async function boot() {
@@ -682,6 +683,30 @@ function applyAccent(accent) {
   const known = ACCENTS.some((a) => a.id === accent) ? accent : 'violet';
   localStorage.setItem(ACCENT_KEY, known);
   document.documentElement.dataset.accent = known;
+}
+
+/**
+ * Mirror the visual viewport into CSS variables.
+ *
+ * When the on-screen keyboard opens, iOS shrinks the visual viewport but
+ * leaves the layout viewport alone, so `position: fixed` puts dialog footers
+ * behind the keyboard. Following the visual viewport keeps them above it.
+ */
+function trackVisualViewport() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  let frame = 0;
+  const sync = () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      const root = document.documentElement.style;
+      root.setProperty('--vv-height', `${Math.round(vv.height)}px`);
+      root.setProperty('--vv-top', `${Math.round(vv.offsetTop)}px`);
+    });
+  };
+  vv.addEventListener('resize', sync);
+  vv.addEventListener('scroll', sync);
+  sync();
 }
 
 function applyTheme(theme) {

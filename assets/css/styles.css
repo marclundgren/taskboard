@@ -481,8 +481,13 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
    Modal
    ============================================================ */
 .modal-scrim {
-  position: fixed; inset: 0; z-index: 60;
-  display: grid; place-items: start center;
+  /* Height tracks the visual viewport (see trackVisualViewport in app.js) so
+     the dialog sits above the on-screen keyboard instead of behind it — iOS
+     does not shrink the layout viewport when the keyboard opens. */
+  position: fixed; left: 0; right: 0; z-index: 60;
+  top: var(--vv-top, 0px);
+  height: var(--vv-height, 100dvh);
+  display: flex; justify-content: center; align-items: flex-start;
   padding: max(4vh, 16px) 16px 16px;
   background: rgba(10, 12, 18, .5); backdrop-filter: blur(2px);
   overflow-y: auto;
@@ -491,21 +496,29 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 @keyframes fade { from { opacity: 0; } }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.985); } }
 .modal {
-  width: min(620px, 100%);
+  display: flex; flex-direction: column;
+  width: min(620px, 100%); max-height: 100%;
   background: var(--bg-elevated); border: 1px solid var(--border);
   border-radius: 16px; box-shadow: var(--shadow-lg);
   animation: pop .16s ease-out;
 }
 .modal--sm { width: min(420px, 100%); }
 .modal__head {
+  flex: none;
   display: flex; align-items: center; gap: 10px;
   padding: 15px 16px; border-bottom: 1px solid var(--border);
 }
 .modal__head h2 { font-size: 15px; flex: 1; }
-.modal__body { padding: 16px; display: grid; gap: 14px; }
+.modal__body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  padding: 16px; display: grid; gap: 14px;
+}
 .modal__foot {
+  flex: none;
   display: flex; align-items: center; gap: 8px;
-  padding: 13px 16px; border-top: 1px solid var(--border);
+  padding: 13px 16px; padding-bottom: max(13px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated); border-radius: 0 0 16px 16px;
 }
 .modal__foot .grow { flex: 1; }
 
@@ -609,6 +622,10 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 }
 @media (max-width: 560px) {
   :root { --col-w: 84vw; }
+  /* Paired fields (Column/Priority, Assignee/Due date) do not fit side by side
+     once controls are at touch size — a native date input alone is wider than
+     half a phone-width dialog. Stack them instead of letting them overflow. */
+  .modal__body .row > .grow { flex-basis: 100%; }
   /* Proximity, not mandatory: mandatory snapping pulled the scroller back to
      the last column and put "Add column" permanently out of reach. Everything
      scrollable in the row is a snap target, including that button. */

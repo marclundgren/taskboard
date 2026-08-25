@@ -81,6 +81,42 @@ try {
   ok('mobile: no text field is small enough to trigger iOS zoom on focus',
      tooSmall.length === 0, JSON.stringify(tooSmall));
 
+  // --- dialog must stay above the on-screen keyboard ---
+  const vv = await phone.evaluate(() => ({
+    height: getComputedStyle(document.documentElement).getPropertyValue('--vv-height').trim(),
+    inner: window.innerHeight,
+  }));
+  ok('mobile: dialogs track the visual viewport', vv.height === `${vv.inner}px`, JSON.stringify(vv));
+
+  await phone.locator('.card').first().tap();
+  await phone.waitForSelector('.modal');
+  // Stand in for the keyboard: the visual viewport shrinks, layout does not.
+  const KEYBOARD_HEIGHT = 380;
+  const shrunk = await phone.evaluate((h) => {
+    document.documentElement.style.setProperty('--vv-height', `${h}px`);
+    const foot = document.querySelector('.modal__foot').getBoundingClientRect();
+    const body = document.querySelector('.modal__body');
+    return {
+      footBottom: Math.round(foot.bottom),
+      footVisible: foot.bottom <= h + 1,
+      bodyScrolls: body.scrollHeight > body.clientHeight,
+    };
+  }, KEYBOARD_HEIGHT);
+  ok('mobile: dialog buttons stay above the keyboard',
+     shrunk.footVisible, `footer bottom ${shrunk.footBottom} vs viewport ${KEYBOARD_HEIGHT}`);
+  ok('mobile: the dialog body scrolls instead of pushing buttons off screen', shrunk.bodyScrolls);
+
+  const overflow = await phone.evaluate(() => {
+    const modal = document.querySelector('.modal').getBoundingClientRect();
+    return [...document.querySelectorAll('.modal__body *')]
+      .filter((el) => el.offsetParent !== null)
+      .map((el) => ({ el: el.className || el.tagName, over: Math.round(el.getBoundingClientRect().right - modal.right) }))
+      .filter((x) => x.over > 1);
+  });
+  ok('mobile: nothing in the dialog overflows its edge', overflow.length === 0, JSON.stringify(overflow));
+  await phone.keyboard.press('Escape');
+  await phone.evaluate(() => document.documentElement.style.removeProperty('--vv-height'));
+
   // columns should still snap, or the phone layout loses its rhythm
   const snaps = await phone.evaluate(() => getComputedStyle(document.getElementById('board')).scrollSnapType);
   ok('mobile: columns still snap while scrolling', snaps.startsWith('x'), snaps);
