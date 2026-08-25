@@ -4,7 +4,7 @@
 import { createProvider, isCloudConfigured, config } from './data/index.js';
 import { makeColumns } from './data/model.js';
 import {
-  $, el, uid, debounce, daysUntil, orderBetween, needsRebalance, ORDER_STEP,
+  $, el, uid, debounce, daysUntil, orderBetween, needsRebalance, ORDER_STEP, ACCENTS,
 } from './util.js';
 import { initDnd } from './dnd.js';
 import { renderBoard, setComposer, clearGrab } from './ui/board.js';
@@ -20,6 +20,7 @@ import { icons } from './ui/icons.js';
 
 const LAST_BOARD_KEY = 'taskboard:v1:lastBoard';
 const THEME_KEY = 'taskboard:v1:theme';
+const ACCENT_KEY = 'taskboard:v1:accent';
 
 const state = {
   provider: null,
@@ -46,6 +47,7 @@ let lastDragEnd = 0;
    Boot
    ================================================================== */
 applyTheme(localStorage.getItem(THEME_KEY) || 'system');
+applyAccent(localStorage.getItem(ACCENT_KEY) || 'violet');
 
 (async function boot() {
   try {
@@ -636,6 +638,8 @@ function openUserMenu(anchor) {
     { label: 'System', checked: theme === 'system', onSelect: () => applyTheme('system') },
     { label: 'Light', icon: icons.sun, checked: theme === 'light', onSelect: () => applyTheme('light') },
     { label: 'Dark', icon: icons.moon, checked: theme === 'dark', onSelect: () => applyTheme('dark') },
+    { type: 'label', text: 'Accent' },
+    accentSwatches(),
     { type: 'sep' },
     { label: 'Keyboard shortcuts', icon: icons.keyboard, onSelect: shortcutsDialog },
     state.provider.updateProfile ? {
@@ -652,6 +656,32 @@ async function renameSelf() {
   });
   if (!name) return;
   await state.provider.updateProfile({ displayName: name }).catch(errorToast);
+}
+
+/** Row of accent swatches; each shows its own tone for the theme in use. */
+function accentSwatches() {
+  const current = localStorage.getItem(ACCENT_KEY) || 'violet';
+  const dark = document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme === 'dark'
+    : window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  const row = el('div', { class: 'swatches', role: 'group', 'aria-label': 'Accent colour' });
+  row.append(...ACCENTS.map((accent) => el('button', {
+    class: 'swatch', type: 'button', title: accent.name, 'aria-label': accent.name,
+    'aria-pressed': String(accent.id === current),
+    style: `background: ${dark ? accent.dark : accent.light}`,
+    onclick: (e) => {
+      applyAccent(accent.id);
+      [...row.children].forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget)));
+    },
+  })));
+  return row;
+}
+
+function applyAccent(accent) {
+  const known = ACCENTS.some((a) => a.id === accent) ? accent : 'violet';
+  localStorage.setItem(ACCENT_KEY, known);
+  document.documentElement.dataset.accent = known;
 }
 
 function applyTheme(theme) {

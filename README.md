@@ -49,7 +49,9 @@ A self-hosted kanban board for a household — shared boards you both see, priva
 
 That third path isn't decoration: WCAG 2.2 asks that anything you can do by dragging also be doable with a single pointer or the keyboard ([SC 2.5.7 Dragging Movements](https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html)).
 
-**Other niceties** — light/dark/system themes, works on phones, installable as a PWA, `?` opens the shortcut sheet.
+**Other niceties** — light/dark/system themes, seven accent palettes (avatar menu → Accent), works on phones, installable as a PWA, `?` opens the shortcut sheet.
+
+Every accent ships a light tone and a dark tone rather than one colour dimmed for both, and each pair is picked to clear 4.5:1 for label text on the accent and for accent-coloured text on its own tint, in both themes.
 
 ---
 

@@ -135,6 +135,17 @@ export const LABEL_COLORS = {
   amber:  '#d9820a', red:  '#e5484d', pink: '#db2777', slate: '#64748b',
 };
 
+/** Accent palettes offered by the picker; each has a light and a dark tone. */
+export const ACCENTS = [
+  { id: 'violet', name: 'Violet', light: '#6d5efc', dark: '#8478ff' },
+  { id: 'blue',   name: 'Blue',   light: '#2563eb', dark: '#6fa5ff' },
+  { id: 'teal',   name: 'Teal',   light: '#0f766e', dark: '#2dd4bf' },
+  { id: 'green',  name: 'Green',  light: '#15803d', dark: '#4ade80' },
+  { id: 'amber',  name: 'Amber',  light: '#b45309', dark: '#fbbf24' },
+  { id: 'rose',   name: 'Rose',   light: '#dc2626', dark: '#fb7185' },
+  { id: 'slate',  name: 'Slate',  light: '#475569', dark: '#a3b1c6' },
+];
+
 export const PRIORITIES = [
   { id: 'none',   name: 'No priority' },
   { id: 'low',    name: 'Low' },
