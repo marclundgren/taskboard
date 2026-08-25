@@ -155,6 +155,11 @@ export function createLocalProvider(config) {
       return user;
     },
 
+    onSyncState(cb) {
+      queueMicrotask(() => cb('local'));
+      return () => {};
+    },
+
     subscribeBoards(cb) {
       listeners.boards.add(cb);
       queueMicrotask(emitBoards);

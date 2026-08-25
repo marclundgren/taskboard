@@ -3,3 +3,4 @@ Thumbs.db
 node_modules/
 .firebase/
 *.log
+tests/e2e/.tmp/

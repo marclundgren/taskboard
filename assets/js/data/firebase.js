@@ -21,6 +21,19 @@ export function createFirebaseProvider(config) {
   let user = null;
   const authListeners = new Set();
 
+  // Live sync state, straight from Firestore snapshot metadata, so the UI can
+  // say whether a change is actually on the server rather than just assuming.
+  const syncListeners = new Set();
+  let syncState = 'connecting';
+  function setSync(next) {
+    if (next === syncState) return;
+    syncState = next;
+    syncListeners.forEach((cb) => cb(next));
+  }
+  const reportMeta = (meta) => setSync(
+    meta.hasPendingWrites ? 'pending' : meta.fromCache ? 'offline' : 'synced',
+  );
+
   async function load() {
     const [app, authMod, dbMod] = await Promise.all([
       import(`${SDK}/firebase-app.js`),
@@ -130,19 +143,57 @@ export function createFirebaseProvider(config) {
 
     async signOut() { await fb.auth.signOut(auth); },
 
+    onSyncState(cb) {
+      syncListeners.add(cb);
+      queueMicrotask(() => cb(syncState));
+      return () => syncListeners.delete(cb);
+    },
+
     subscribeBoards(cb, onError) {
       const { collection, query, where, onSnapshot } = fb.db;
       const q = query(collection(db, 'boards'), where('memberIds', 'array-contains', user.uid));
-      return onSnapshot(q,
-        (snap) => cb(snap.docs.map((d) => normalizeBoard({ id: d.id, ...d.data() }))),
+      return onSnapshot(q, { includeMetadataChanges: true },
+        (snap) => {
+          reportMeta(snap.metadata);
+          cb(snap.docs.map((d) => normalizeBoard({ id: d.id, ...d.data() })));
+        },
         (err) => onError?.(friendlyError(err)));
     },
 
+    /**
+     * Cards for one board.
+     *
+     * The boards listener hands us a board the moment it is written locally,
+     * which can be before the server has it. The rules for this subcollection
+     * read the parent board, so a listen opened in that window is denied — and
+     * a denied listen stays dead. Retry briefly before treating it as a real
+     * permission problem.
+     */
     subscribeTasks(boardId, cb, onError) {
       const { onSnapshot } = fb.db;
-      return onSnapshot(tasksRef(boardId),
-        (snap) => cb(snap.docs.map((d) => normalizeTask({ id: d.id, ...d.data() }))),
-        (err) => onError?.(friendlyError(err)));
+      let stopped = false;
+      let unsub = null;
+      let attempt = 0;
+
+      const attach = () => {
+        if (stopped) return;
+        unsub = onSnapshot(tasksRef(boardId), { includeMetadataChanges: true },
+          (snap) => {
+            attempt = 0;
+            reportMeta(snap.metadata);
+            cb(snap.docs.map((d) => normalizeTask({ id: d.id, ...d.data() })));
+          },
+          (err) => {
+            if (err?.code === 'permission-denied' && attempt < 5 && !stopped) {
+              setTimeout(attach, 300 * 2 ** attempt++);
+              return;
+            }
+            onError?.(friendlyError(err));
+          });
+      };
+
+      attach();
+      return () => { stopped = true; unsub?.(); };
     },
 
     async createBoard(data) {

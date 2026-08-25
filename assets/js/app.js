@@ -32,6 +32,7 @@ const state = {
   profiles: {},
   taskCounts: {},
   filters: { assignee: '', due: '', priority: '', label: '', hideDone: false, text: '' },
+  sync: 'connecting',
   loading: true,
 };
 
@@ -94,9 +95,11 @@ function showAuth(error) {
         class: 'btn btn--primary', type: 'button',
         text: p === 'github' ? 'Continue with GitHub' : 'Continue with Google',
         onclick: async (e) => {
-          e.currentTarget.disabled = true;
+          // Hold the node: currentTarget is null once the handler resumes.
+          const button = e.currentTarget;
+          button.disabled = true;
           try { await state.provider.signIn(p); }
-          catch (err) { showAuthError(err.message); e.currentTarget.disabled = false; }
+          catch (err) { showAuthError(err.message); button.disabled = false; }
         },
       }));
     }
@@ -151,6 +154,11 @@ function startSession() {
   $('#boot').hidden = true;
   $('#app').hidden = false;
   setupChrome();
+
+  state.provider.onSyncState?.((next) => {
+    state.sync = next;
+    if (!$('#app').hidden) renderSyncChip();
+  });
 
   // Boards invited to this address before the account existed become ours now.
   state.provider.claimInvites?.()
@@ -254,8 +262,26 @@ function render() {
   renderSidebar($('#board-list'), ctx);
   renderTopbar();
   renderBoard($('#board'), ctx);
-  $('#mode-chip').dataset.mode = state.provider.mode;
-  $('#mode-chip').textContent = state.provider.mode === 'cloud' ? 'Synced to cloud' : 'Saved in this browser';
+  renderSyncChip();
+}
+
+const SYNC_LABELS = {
+  local:      ['local',   'Saved in this browser'],
+  synced:     ['cloud',   'Synced to cloud'],
+  pending:    ['pending', 'Saving…'],
+  offline:    ['offline', 'Offline — changes queued'],
+  connecting: ['cloud',   'Connecting…'],
+};
+
+function renderSyncChip() {
+  const chip = $('#mode-chip');
+  const [mode, label] = SYNC_LABELS[state.provider.mode === 'local' ? 'local' : state.sync]
+    || SYNC_LABELS.connecting;
+  chip.dataset.mode = mode;
+  chip.textContent = label;
+  chip.title = state.user?.email
+    ? `Signed in as ${state.user.email}`
+    : 'Boards are stored in this browser';
 }
 
 function renderTopbar() {

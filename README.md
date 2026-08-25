@@ -199,6 +199,16 @@ Everyone on a shared board is an equal editor, including inviting and removing o
 
 ---
 
+## Tests
+
+`tests/e2e` runs the real app against the Firebase emulators in two isolated
+browser profiles and proves a task created in one is stored server-side and
+visible in the other — including live sync and offline queueing. See
+[tests/e2e/README.md](tests/e2e/README.md).
+
+Append `?mode=local` to any URL to force the localStorage backend without
+touching `config.js`.
+
 ## How it's built
 
 Plain ES modules, no framework, no bundler — so what you push is exactly what runs, and it will still run in five years.
