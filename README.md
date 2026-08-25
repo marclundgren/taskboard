@@ -220,6 +220,17 @@ visible in the other — including live sync and offline queueing. See
 Append `?mode=local` to any URL to force the localStorage backend without
 touching `config.js`.
 
+## Deploying a change
+
+```bash
+node tools/stamp.mjs && git commit -am "…" && git push
+```
+
+`tools/stamp.mjs` writes a build id into `index.html` and appends it to the
+stylesheet and script URLs, so a deploy can't be masked by a cached asset. The
+running build id is shown at the bottom of the avatar menu — handy for telling
+whether a browser has picked up the latest deploy.
+
 ## How it's built
 
 Plain ES modules, no framework, no bundler — so what you push is exactly what runs, and it will still run in five years.

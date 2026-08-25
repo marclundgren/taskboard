@@ -647,6 +647,8 @@ function openUserMenu(anchor) {
       label: 'Change display name', icon: icons.pencil, onSelect: renameSelf,
     } : null,
     { label: 'Sign out', icon: icons.logout, onSelect: () => state.provider.signOut() },
+    { type: 'sep' },
+    { type: 'label', text: `Build ${buildId()}` },
   ].filter(Boolean));
 }
 
@@ -677,6 +679,11 @@ function accentSwatches() {
     },
   })));
   return row;
+}
+
+/** Which deploy this browser is actually running — see tools/stamp.mjs. */
+function buildId() {
+  return document.querySelector('meta[name="app-version"]')?.content || 'dev';
 }
 
 function applyAccent(accent) {
