@@ -18,6 +18,7 @@ export function makeBoard({ name, emoji = '📋', visibility = 'private', ownerI
     visibility,
     ownerId,
     memberIds: [ownerId],
+    pendingEmails: [],
     columns,
     labels: [
       { id: uid('lb_'), name: 'Home',    color: LABEL_COLORS.green },
@@ -55,6 +56,7 @@ export function normalizeBoard(b) {
     emoji: '📋',
     visibility: 'private',
     memberIds: [],
+    pendingEmails: [],
     columns: [],
     labels: [],
     ...b,

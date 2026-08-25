@@ -19,6 +19,7 @@ A self-hosted kanban board for a household — shared boards you both see, priva
 **Signing in**
 - **Continue with Google** in both modes — same button, same account, whichever backend you run
 - In cloud mode that account is your identity everywhere: sign in on your laptop, phone and tablet and you get the same boards, syncing live
+- Invite people who have not signed up yet — the board is waiting for them when they first sign in
 - In local mode it keeps two people's boards apart on a shared computer (the data still never leaves that browser)
 
 **Boards**
@@ -156,7 +157,11 @@ firebase deploy --only firestore:rules
 
 **6. Invite your partner**
 
-Commit and push, open the Pages URL, sign in with Google. Have your partner open the same URL and sign in once — that publishes their profile. Then open a board → **Share** → type their email → **Add**. The board moves to *Shared* for both of you and edits appear on each other's screens live.
+Commit and push, open the Pages URL, sign in with Google. Then open a board → **Share** → type their email → **Add**.
+
+They do not need an account yet. If they already have one they join immediately; if not, the address is parked on the board and the board is waiting for them the first time they sign in with that address. Either way the board moves to *Shared* and edits appear on each other's screens live.
+
+Taskboard cannot send the invitation email itself — a static site has no server and no mail credentials. **Write the email** in the Share dialog opens your own mail app with the link and instructions filled in, and **Copy link** gives you something to paste into a message. If you would rather it sent automatically, install the [Trigger Email from Firestore](https://extensions.dev/extensions/firebase/firestore-send-email) extension (needs the pay-as-you-go Blaze plan and an SMTP account) and write invitations to its `mail` collection.
 
 ### How access works
 
@@ -164,10 +169,12 @@ One idea, applied everywhere: a board is visible to exactly the user IDs listed 
 
 | Path | Who can read | Who can write |
 | --- | --- | --- |
-| `boards/{id}` | members | members (the owner can't be changed; only the owner can delete) |
+| `boards/{id}` | members, plus anyone holding a pending invitation to it | members (the owner can't be changed; only the owner can delete) |
 | `boards/{id}/tasks/{id}` | members | members |
 | `users/{uid}` | any signed-in user | only that user |
 | `emailIndex/{email}` | any signed-in user | only the owner of that email |
+
+An invitee's one permitted write is swapping their pending invitation for membership — they cannot change anything else on the board until they are a member, and cards stay unreadable until then.
 
 `emailIndex` is what makes "invite by email" work without a server: each person claims their own email → uid mapping when they sign in. It means a signed-in user can check whether an email has an account here — the tradeoff for serverless invites on a board you host yourself.
 
@@ -226,7 +233,8 @@ assets/js/
 
 ```
 boards/{boardId}
-  name, emoji, ownerId, memberIds[], visibility, columns[], labels[], timestamps
+  name, emoji, ownerId, memberIds[], pendingEmails[], visibility,
+  columns[], labels[], timestamps
 boards/{boardId}/tasks/{taskId}
   title, notes, columnId, order, priority, labels[], dueDate,
   assigneeId, checklist[], done, timestamps

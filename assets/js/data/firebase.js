@@ -158,20 +158,63 @@ export function createFirebaseProvider(config) {
       await deleteDoc(boardRef(boardId));
     },
 
-    /** Look up a uid by email and add them to the board. */
+    /**
+     * Invite by email. If they already have an account they join immediately;
+     * if not, the address is parked on the board and they pick it up the first
+     * time they sign in (see claimInvites).
+     */
     async addMember(boardId, email) {
       const { doc, getDoc, updateDoc, arrayUnion } = fb.db;
       const key = String(email || '').trim().toLowerCase();
-      if (!key) throw new Error('Enter an email address.');
+      if (!key || !key.includes('@')) throw new Error('Enter an email address.');
+
       const idx = await getDoc(doc(db, 'emailIndex', key)).catch((e) => { throw friendlyError(e); });
-      if (!idx.exists()) {
-        throw new Error(`No Taskboard account for ${key} yet. Ask them to sign in once, then invite them.`);
+      if (idx.exists()) {
+        await updateDoc(boardRef(boardId), {
+          memberIds: arrayUnion(idx.data().uid), visibility: 'shared', updatedAt: Date.now(),
+        }).catch((e) => { throw friendlyError(e); });
+        return { status: 'joined', email: key, uid: idx.data().uid };
       }
-      const memberId = idx.data().uid;
+
       await updateDoc(boardRef(boardId), {
-        memberIds: arrayUnion(memberId), visibility: 'shared', updatedAt: Date.now(),
+        pendingEmails: arrayUnion(key), visibility: 'shared', updatedAt: Date.now(),
       }).catch((e) => { throw friendlyError(e); });
-      return memberId;
+      return { status: 'invited', email: key };
+    },
+
+    /** Withdraw an invitation that hasn't been taken up yet. */
+    async cancelInvite(boardId, email) {
+      const { updateDoc, arrayRemove } = fb.db;
+      await updateDoc(boardRef(boardId), {
+        pendingEmails: arrayRemove(String(email).toLowerCase()), updatedAt: Date.now(),
+      }).catch((e) => { throw friendlyError(e); });
+    },
+
+    /**
+     * Turn invitations addressed to this account into memberships. Runs once
+     * per sign-in; boards invited before the account existed appear here.
+     */
+    async claimInvites() {
+      const { collection, query, where, getDocs, updateDoc } = fb.db;
+      const email = (user?.email || '').toLowerCase();
+      if (!email) return 0;
+
+      const q = query(collection(db, 'boards'), where('pendingEmails', 'array-contains', email));
+      const snap = await getDocs(q);
+      let claimed = 0;
+      for (const docSnap of snap.docs) {
+        const data = docSnap.data();
+        // Written as explicit arrays rather than arrayUnion/arrayRemove so the
+        // security rule can see exactly what the document becomes.
+        await updateDoc(docSnap.ref, {
+          memberIds: [...new Set([...(data.memberIds || []), user.uid])],
+          pendingEmails: (data.pendingEmails || []).filter((e) => e !== email),
+          visibility: 'shared',
+          updatedAt: Date.now(),
+        });
+        claimed += 1;
+      }
+      return claimed;
     },
 
     async removeMember(boardId, memberId) {

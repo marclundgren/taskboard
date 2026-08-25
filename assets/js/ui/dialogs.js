@@ -140,9 +140,11 @@ export function shareDialog(ctx, boardId = null) {
   const list = el('div');
   const email = el('input', { class: 'input', type: 'email', placeholder: 'partner@example.com', 'data-autofocus': '' });
 
+  const boardUrl = `${location.origin}${location.pathname}#/b/${board.id}`;
+
   const renderMembers = () => {
     const current = state.boards.find((b) => b.id === board.id) || board;
-    list.replaceChildren(...(current.memberIds || []).map((id) => {
+    const members = (current.memberIds || []).map((id) => {
       const p = state.profiles[id] || { uid: id, displayName: id === state.user.uid ? 'You' : 'Member' };
       const isOwner = id === current.ownerId;
       return el('div', { class: 'member-row' }, [
@@ -159,7 +161,24 @@ export function shareDialog(ctx, boardId = null) {
           },
         }),
       ]);
-    }));
+    });
+
+    const invited = (current.pendingEmails || []).map((address) => el('div', { class: 'member-row' }, [
+      el('span', { class: 'avatar', title: address, text: '✉︎' }),
+      el('div', { class: 'who' }, [
+        el('b', { text: address }),
+        el('span', { text: 'Invited — joins when they first sign in' }),
+      ]),
+      el('button', {
+        class: 'btn btn--sm', type: 'button', text: 'Cancel',
+        onclick: async () => {
+          await actions.cancelInvite(current.id, address).catch(errorToast);
+          renderMembers();
+        },
+      }),
+    ]));
+
+    list.replaceChildren(...members, ...invited);
   };
   renderMembers();
 
@@ -167,10 +186,15 @@ export function shareDialog(ctx, boardId = null) {
     const value = email.value.trim();
     if (!value) return;
     try {
-      await actions.addMember(board.id, value);
+      const result = await actions.addMember(board.id, value);
       email.value = '';
-      toast(`${value} can now see this board.`);
       renderMembers();
+      if (result?.status === 'invited') {
+        toast(`${value} is invited. Send them the link so they know to sign in.`, { duration: 7000 });
+        openInviteMessage(board, value, boardUrl);
+      } else {
+        toast(`${value} can now see this board.`);
+      }
     } catch (err) { errorToast(err); }
   };
 
@@ -184,13 +208,52 @@ export function shareDialog(ctx, boardId = null) {
           email,
           el('button', { class: 'btn btn--primary', type: 'button', text: 'Add', onclick: invite }),
         ]),
-        el('p', { class: 'meta-note', text: 'They need to sign in to this Taskboard once first — then their email becomes invitable.' }),
+        el('p', { class: 'meta-note', text: 'They can be invited before they have an account — the board is waiting for them the first time they sign in with that address.' }),
       ]),
       el('div', { class: 'field' }, [el('label', { text: 'People with access' }), list]),
+      el('div', { class: 'field' }, [
+        el('label', { text: 'Invite link' }),
+        el('div', { class: 'row' }, [
+          el('button', {
+            class: 'btn btn--sm', type: 'button', text: 'Copy link',
+            onclick: (e) => copyText(boardUrl, e.currentTarget),
+          }),
+          el('button', {
+            class: 'btn btn--sm', type: 'button', text: 'Write the email',
+            onclick: () => openInviteMessage(board, email.value.trim(), boardUrl),
+          }),
+        ]),
+      ]),
     ],
     footer: [el('span', { class: 'grow' }), el('button', { class: 'btn btn--primary', type: 'button', text: 'Done', onclick: () => m.close() })],
   });
   email.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); invite(); } });
+}
+
+/** Hands the invite to the person's own mail app — no mail server involved. */
+function openInviteMessage(board, address, url) {
+  const subject = `I shared the “${board.name}” board with you`;
+  const body = [
+    `I've shared a task board with you: ${board.name}`,
+    '',
+    `Open ${url} and sign in with Google using this email address (${address || 'the address I invited'}).`,
+    'The board will be there waiting for you.',
+  ].join('\n');
+  location.href = `mailto:${encodeURIComponent(address || '')}`
+    + `?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+async function copyText(text, button) {
+  const label = button.textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    button.textContent = 'Copied';
+  } catch {
+    // Clipboard access can be refused; fall back to showing the link to select.
+    window.prompt('Copy this link', text);
+    return;
+  }
+  setTimeout(() => { button.textContent = label; }, 1600);
 }
 
 export function filterDialog(ctx) {

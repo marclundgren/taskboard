@@ -3,12 +3,16 @@ rules_version = '2';
 /*
   Taskboard access rules.
 
-  The whole model is one idea: a board is visible to exactly the uids listed in
-  its memberIds array. A "private" board is one where that list is just you.
-  Tasks live under the board and inherit its membership.
+  A board is visible to exactly the uids in its memberIds. A "private" board is
+  one where that list is just you.
+
+  Boards can also carry pendingEmails: people invited before they had an
+  account. Someone whose verified email is on that list may read the board and
+  perform exactly one write — adding themselves to memberIds and taking their
+  address off pendingEmails. After that they are an ordinary member.
 
   Deploy with:  firebase deploy --only firestore:rules
-  (or paste this file into Firebase console -> Firestore -> Rules)
+  (or paste this file into Firebase console -> Firestore Database -> Rules)
 */
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -21,6 +25,25 @@ service cloud.firestore {
       return signedIn() && request.auth.uid in board.memberIds;
     }
 
+    /** Verified-email holder named in this board's pending invitations. */
+    function isInvited(board) {
+      return signedIn()
+             && request.auth.token.email != null
+             && request.auth.token.email_verified == true
+             && 'pendingEmails' in board
+             && request.auth.token.email.lower() in board.pendingEmails;
+    }
+
+    /** The one write an invitee may make: swap their invitation for membership. */
+    function isClaimingInvite() {
+      return isInvited(resource.data)
+             && request.resource.data.ownerId == resource.data.ownerId
+             && request.auth.uid in request.resource.data.memberIds
+             && request.resource.data.memberIds.hasOnly(resource.data.memberIds.concat([request.auth.uid]))
+             && request.resource.data.pendingEmails.hasOnly(resource.data.pendingEmails)
+             && !(request.auth.token.email.lower() in request.resource.data.pendingEmails);
+    }
+
     function boardData(boardId) {
       return get(/databases/$(database)/documents/boards/$(boardId)).data;
     }
@@ -31,7 +54,7 @@ service cloud.firestore {
       allow write: if signedIn() && request.auth.uid == userId;
     }
 
-    // email -> uid, so a board owner can invite someone by their email address.
+    // email -> uid, so an existing account can be invited straight to a board.
     // Readable by any signed-in user; each person may only claim their own email.
     match /emailIndex/{email} {
       allow read: if signedIn();
@@ -40,19 +63,21 @@ service cloud.firestore {
     }
 
     match /boards/{boardId} {
-      allow read: if isMember(resource.data);
+      allow read: if isMember(resource.data) || isInvited(resource.data);
 
       allow create: if signedIn()
                     && request.resource.data.ownerId == request.auth.uid
                     && request.auth.uid in request.resource.data.memberIds;
 
-      // Any member may edit the board (columns, labels, invites). Ownership is
-      // fixed: a member cannot promote themselves to owner.
-      allow update: if isMember(resource.data)
-                    && request.resource.data.ownerId == resource.data.ownerId;
+      // Any member may edit the board (columns, labels, invitations). Ownership
+      // is fixed: a member cannot promote themselves to owner.
+      allow update: if (isMember(resource.data)
+                        && request.resource.data.ownerId == resource.data.ownerId)
+                    || isClaimingInvite();
 
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
 
+      // Cards are for members only — an invitee sees nothing until they claim.
       match /tasks/{taskId} {
         allow read, write: if isMember(boardData(boardId));
       }

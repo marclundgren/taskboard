@@ -152,6 +152,11 @@ function startSession() {
   $('#app').hidden = false;
   setupChrome();
 
+  // Boards invited to this address before the account existed become ours now.
+  state.provider.claimInvites?.()
+    .then((n) => { if (n) toast(`You were added to ${n} shared board${n > 1 ? 's' : ''}.`); })
+    .catch((err) => console.warn('[taskboard] could not claim invitations', err));
+
   unsubBoards?.();
   unsubBoards = state.provider.subscribeBoards((boards) => {
     state.boards = boards;
@@ -338,7 +343,11 @@ const actions = {
     selectBoard(state.boards.find((b) => b.id !== state.boardId)?.id || null);
     toast(`Board “${name}” deleted.`);
   },
-  addMember: (boardId, email) => state.provider.addMember(boardId, email).then((id) => { loadProfiles(); return id; }),
+  addMember: (boardId, email) => state.provider.addMember(boardId, email).then((result) => {
+    loadProfiles();
+    return result;
+  }),
+  cancelInvite: (boardId, email) => state.provider.cancelInvite(boardId, email),
   removeMember: (boardId, memberId) => state.provider.removeMember(boardId, memberId),
   deleteLabel: async (labelId) => {
     await state.provider.updateBoard(state.boardId, {
