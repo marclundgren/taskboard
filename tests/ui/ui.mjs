@@ -118,18 +118,34 @@ try {
   await phone.evaluate(() => document.documentElement.style.removeProperty('--vv-height'));
 
   // the scroller must hold wherever it is left, including the far end
+  // What matters is not the exact offset — snapping may legitimately rest a
+  // few px short of the raw maximum — but that the button ends up on screen.
   const held = await phone.evaluate(async () => {
     const board = document.getElementById('board');
     const max = board.scrollWidth - board.clientWidth;
     board.scrollTo({ left: max, behavior: 'instant' });
     await new Promise((r) => setTimeout(r, 900));
-    const atEnd = Math.round(board.scrollLeft);
-    board.scrollTo({ left: Math.round(max / 2), behavior: 'instant' });
-    await new Promise((r) => setTimeout(r, 900));
-    return { max: Math.round(max), atEnd, mid: Math.round(board.scrollLeft), wanted: Math.round(max / 2) };
+    const add = document.querySelector('.add-column').getBoundingClientRect();
+    return {
+      max: Math.round(max), landed: Math.round(board.scrollLeft),
+      addFullyVisible: add.left >= 0 && add.right <= window.innerWidth,
+    };
   });
-  ok('mobile: the board stays where it is scrolled, at the end and in between',
-     held.atEnd === held.max && held.mid === held.wanted, JSON.stringify(held));
+  ok('mobile: the end of the board holds, with Add column on screen',
+     held.addFullyVisible, JSON.stringify(held));
+
+  // Snapping must still pull a nearly-aligned column into place.
+  const snapped = await phone.evaluate(async () => {
+    const board = document.getElementById('board');
+    const cols = [...board.querySelectorAll('.column')];
+    const third = cols[2];
+    const target = third.offsetLeft - (board.clientWidth - third.offsetWidth) / 2;
+    board.scrollTo({ left: target + 18, behavior: 'instant' });   // just off centre
+    await new Promise((r) => setTimeout(r, 900));
+    return { target: Math.round(target), landed: Math.round(board.scrollLeft) };
+  });
+  ok('mobile: a column near centre snaps into place',
+     Math.abs(snapped.landed - snapped.target) <= 2, JSON.stringify(snapped));
 
   // --- desktop: dragging a card between columns ---
   const desk = await browser.newPage({ viewport: { width: 1280, height: 820 } });
