@@ -226,10 +226,17 @@ touching `config.js`.
 node tools/stamp.mjs && git commit -am "…" && git push
 ```
 
-`tools/stamp.mjs` writes a build id into `index.html` and appends it to the
-stylesheet and script URLs, so a deploy can't be masked by a cached asset. The
-running build id is shown at the bottom of the avatar menu — handy for telling
-whether a browser has picked up the latest deploy.
+`tools/stamp.mjs` does two things. It writes a build id into `index.html` and
+appends it to the stylesheet and script URLs, so a deploy can't be masked by a
+cached asset — the running build id is shown at the bottom of the avatar menu.
+And it refuses to stamp a tree that GitHub Pages cannot archive: Pages packs
+the repo with `tar --dereference`, so a committed symlink whose target isn't
+committed fails the build and leaves the previous version live, with no error
+anywhere you would normally look.
+
+After pushing, check the deploy actually ran:
+<https://github.com/marclundgren/taskboard/actions>. A red "pages build and
+deployment" means the site is still serving the last good build.
 
 ## How it's built
 
