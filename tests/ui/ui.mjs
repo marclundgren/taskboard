@@ -117,9 +117,19 @@ try {
   await phone.keyboard.press('Escape');
   await phone.evaluate(() => document.documentElement.style.removeProperty('--vv-height'));
 
-  // columns should still snap, or the phone layout loses its rhythm
-  const snaps = await phone.evaluate(() => getComputedStyle(document.getElementById('board')).scrollSnapType);
-  ok('mobile: columns still snap while scrolling', snaps.startsWith('x'), snaps);
+  // the scroller must hold wherever it is left, including the far end
+  const held = await phone.evaluate(async () => {
+    const board = document.getElementById('board');
+    const max = board.scrollWidth - board.clientWidth;
+    board.scrollTo({ left: max, behavior: 'instant' });
+    await new Promise((r) => setTimeout(r, 900));
+    const atEnd = Math.round(board.scrollLeft);
+    board.scrollTo({ left: Math.round(max / 2), behavior: 'instant' });
+    await new Promise((r) => setTimeout(r, 900));
+    return { max: Math.round(max), atEnd, mid: Math.round(board.scrollLeft), wanted: Math.round(max / 2) };
+  });
+  ok('mobile: the board stays where it is scrolled, at the end and in between',
+     held.atEnd === held.max && held.mid === held.wanted, JSON.stringify(held));
 
   // --- desktop: dragging a card between columns ---
   const desk = await browser.newPage({ viewport: { width: 1280, height: 820 } });
@@ -146,6 +156,16 @@ try {
   ok('keyboard: a focused card can be moved with the arrow keys',
      (await desk.locator('.column', { hasText: 'In progress' }).locator('.card__title').allTextContents())
        .includes('Open me to add notes, a due date and a checklist'));
+
+  await desk.locator('.card').first().click();
+  await desk.waitForSelector('.modal');
+  await desk.locator('.modal button:has-text("+ Add item")').click();
+  const deskSmall = await desk.evaluate(() => [...document.querySelectorAll('input, textarea, select')]
+    .filter((el) => el.type !== 'checkbox' && el.offsetParent !== null)
+    .map((el) => ({ el: el.className || el.type, px: parseFloat(getComputedStyle(el).fontSize) }))
+    .filter((f) => f.px < 16));
+  ok('desktop: the 16px floor applies without a media query', deskSmall.length === 0, JSON.stringify(deskSmall));
+  await desk.keyboard.press('Escape');
 
   ok('no JavaScript errors', errors.length === 0, errors.join(' | '));
 } finally {

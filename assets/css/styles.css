@@ -626,11 +626,11 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
      once controls are at touch size — a native date input alone is wider than
      half a phone-width dialog. Stack them instead of letting them overflow. */
   .modal__body .row > .grow { flex-basis: 100%; }
-  /* Proximity, not mandatory: mandatory snapping pulled the scroller back to
-     the last column and put "Add column" permanently out of reach. Everything
-     scrollable in the row is a snap target, including that button. */
-  .board { padding: 10px; scroll-snap-type: x proximity; }
-  .column, .add-column { scroll-snap-align: center; }
+  /* No scroll snapping. Snapping cannot rest on the last thing in the row —
+     centring an element at the end of the scroll range is impossible, so the
+     scroller sprang back to the last column and "Add column" could not be
+     reached. Free scrolling always reaches the end. */
+  .board { padding: 10px; }
   .add-column { width: min(210px, 62vw); }
   .search { display: none; }
 }
@@ -684,22 +684,20 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 .swatch:hover { transform: scale(1.12); }
 .swatch[aria-pressed="true"] { border-color: var(--text); }
 
-
 /* ============================================================
-   Touch input sizing
+   Text control sizing — must stay last in this file
    ------------------------------------------------------------
-   iOS Safari zooms the whole page whenever a focused field's text
-   is smaller than 16px, and it does not zoom back out on blur —
-   which leaves the board panned sideways and awkward to scroll.
-   Keeping every text control at 16px on touch devices removes the
-   trigger entirely, without taking deliberate pinch-zoom away.
+   iOS Safari zooms the page whenever a focused field renders
+   smaller than 16px and never zooms back out, which leaves the
+   board panned sideways. Unconditional on purpose: gating this on
+   a media query means trusting that query to match on hardware I
+   cannot test. Last in the file on purpose too — .check-row
+   .check-text and .composer textarea set smaller sizes above, and
+   would otherwise win on source order.
    ============================================================ */
-@media (pointer: coarse) {
-  input, textarea, select,
-  .input, .textarea, .select,
-  .search input,
-  .composer textarea,
-  .check-row .check-text { font-size: 16px; }
-  .title-input { font-size: 19px; }
-  .btn, .chip { font-size: 14px; }
-}
+input, textarea, select,
+.input, .textarea, .select,
+.search input,
+.composer textarea,
+.check-row .check-text { font-size: 16px; }
+.title-input { font-size: 19px; }
