@@ -12,7 +12,7 @@ import { renderSidebar } from './ui/sidebar.js';
 import { openTaskModal } from './ui/task-modal.js';
 import { newBoardDialog, boardSettingsDialog, shareDialog, filterDialog, shortcutsDialog } from './ui/dialogs.js';
 import { openMenu } from './ui/menu.js';
-import { confirmModal, promptModal } from './ui/modal.js';
+import { confirmModal, promptModal, wipLimitModal } from './ui/modal.js';
 import { toast, errorToast, announce } from './ui/toast.js';
 import { avatarNode } from './ui/common.js';
 import { renderGoogleButton } from './data/google-identity.js';
@@ -406,13 +406,12 @@ const actions = {
   },
   setWipLimit: async (columnId) => {
     const col = state.board.columns.find((c) => c.id === columnId);
-    const value = await promptModal({
-      title: 'WIP limit', label: 'Maximum tasks in this column', type: 'number',
-      value: String(col.wipLimit || ''), placeholder: '0 for no limit',
+    const wipLimit = await wipLimitModal({
+      value: col.wipLimit || 0,
       hint: 'A work-in-progress limit is the core kanban rule: when a column is full, finish something before starting anything new.',
     });
-    if (value == null) return;
-    await patchColumn(columnId, { wipLimit: Math.max(0, Number(value) || 0) }).catch(errorToast);
+    if (wipLimit == null) return;
+    await patchColumn(columnId, { wipLimit }).catch(errorToast);
   },
   toggleDoneColumn: (columnId) => {
     const col = state.board.columns.find((c) => c.id === columnId);
