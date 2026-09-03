@@ -127,7 +127,8 @@ export function wipLimitModal({ value = 0, hint } = {}) {
     const done = (v) => { if (!settled) { settled = true; resolve(v); } };
     const unlimited = !value;
     const input = el('input', {
-      class: 'input', type: 'number', min: '1', value: value || '', placeholder: 'e.g. 3',
+      class: 'input', type: 'number', min: '1', step: '1', inputmode: 'numeric',
+      value: value || '', placeholder: 'e.g. 3',
       disabled: unlimited, 'data-autofocus': unlimited ? false : '',
     });
     const checkbox = el('input', {
@@ -137,9 +138,14 @@ export function wipLimitModal({ value = 0, hint } = {}) {
       input.disabled = checkbox.checked;
       if (!checkbox.checked) { input.focus(); input.select(); }
     });
+    // Whole positive numbers only — strips '-', '.', 'e' etc. as the user types or pastes.
+    input.addEventListener('input', () => {
+      const digitsOnly = input.value.replace(/[^\d]/g, '');
+      if (digitsOnly !== input.value) input.value = digitsOnly;
+    });
     const submit = () => {
       if (checkbox.checked) { done(0); m.close(); return; }
-      const n = Math.max(0, Number(input.value) || 0);
+      const n = Math.max(0, Math.trunc(Number(input.value)) || 0);
       if (!n) { input.focus(); return; }
       done(n); m.close();
     };
