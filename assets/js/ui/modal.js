@@ -119,3 +119,53 @@ export function promptModal({ title, label, value = '', placeholder = '', confir
     input.select();
   });
 }
+
+/** WIP limit dialog: a number input plus an "Unlimited" toggle. Resolves to the limit (0 = unlimited), or null if cancelled. */
+export function wipLimitModal({ value = 0, hint } = {}) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+    const unlimited = !value;
+    const input = el('input', {
+      class: 'input', type: 'number', min: '1', step: '1', inputmode: 'numeric',
+      value: value || '', placeholder: 'e.g. 3',
+      disabled: unlimited, 'data-autofocus': unlimited ? false : '',
+    });
+    const checkbox = el('input', {
+      type: 'checkbox', checked: unlimited, 'data-autofocus': unlimited ? '' : false,
+    });
+    checkbox.addEventListener('change', () => {
+      input.disabled = checkbox.checked;
+      if (!checkbox.checked) { input.focus(); input.select(); }
+    });
+    // Whole positive numbers only — strips '-', '.', 'e' etc. as the user types or pastes.
+    input.addEventListener('input', () => {
+      const digitsOnly = input.value.replace(/[^\d]/g, '');
+      if (digitsOnly !== input.value) input.value = digitsOnly;
+    });
+    const submit = () => {
+      if (checkbox.checked) { done(0); m.close(); return; }
+      const n = Math.max(0, Math.trunc(Number(input.value)) || 0);
+      if (!n) { input.focus(); return; }
+      done(n); m.close();
+    };
+    const m = openModal({
+      title: 'WIP limit', size: 'sm',
+      body: [
+        el('div', { class: 'field' }, [el('label', { text: 'Maximum tasks in this column' }), input]),
+        el('label', { class: 'row', style: 'align-items:center;gap:8px;cursor:pointer' }, [
+          checkbox, el('span', { text: 'Unlimited (no WIP limit)' }),
+        ]),
+        hint ? el('p', { class: 'meta-note', text: hint, style: 'margin:0' }) : null,
+      ],
+      footer: [
+        el('span', { class: 'grow' }),
+        el('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: () => m.close() }),
+        el('button', { class: 'btn btn--primary', type: 'button', text: 'Save', onclick: submit }),
+      ],
+      onClose: () => done(null),
+    });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+    if (!unlimited) input.select();
+  });
+}
