@@ -79,6 +79,22 @@ The repo *is* the site — there is nothing to build.
 
 > **Note:** a GitHub Pages site is public — anyone with the URL loads the app. That is fine, because the *app* is public but your *data* is not: in local mode the data never leaves your browser, and in cloud mode it lives in your Firebase project behind sign-in and the rules in `firestore.rules`. Never put anything secret in this repo.
 
+## Running it with Docker
+
+Or host it yourself: nginx serves the same files from a container that comes back up after a reboot.
+
+```bash
+docker compose up -d --build        # http://localhost:4420
+```
+
+Run the same command again after pulling a change. For HTTPS on your tailnet (Tailscale Serve):
+
+```bash
+sudo tailscale serve --bg --https=8443 4420     # https://<machine>.<tailnet>.ts.net:8443
+```
+
+In cloud mode, add that host name under **Firebase console → Authentication → Settings → Authorized domains**, or Google sign-in will be refused.
+
 ---
 
 ## How sign-in works

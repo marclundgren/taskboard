@@ -1,0 +1,7 @@
+services:
+  taskboard:
+    build: .
+    image: taskboard
+    ports:
+      - "4420:80"
+    restart: unless-stopped
